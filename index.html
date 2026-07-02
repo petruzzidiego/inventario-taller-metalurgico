@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Stock - CEBECO S.A.</title>
+    <style>
+        :root {
+            --bg-primary: #1e222b;
+            --bg-secondary: #252a34;
+            --bg-card: #2d3442;
+            --text-main: #ffffff;
+            --text-muted: #99a2b3;
+            --accent: #00adb5;
+            --accent-hover: #008f96;
+            --success: #2ecc71;
+            --danger: #e74c3c;
+            --border: #384152;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        body { background-color: var(--bg-primary); color: var(--text-main); padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        
+        header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding-bottom: 20px; 
+            border-bottom: 2px solid var(--border); 
+            margin-bottom: 25px; 
+        }
+        .header-actions { display: flex; gap: 10px; }
+        h1 span { color: var(--accent); }
+        
+        .tabs { display: flex; gap: 8px; margin-bottom: 25px; background: var(--bg-secondary); padding: 6px; border-radius: 8px; }
+        .tab-btn { background: transparent; color: var(--text-muted); padding: 12px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .tab-btn.active { background: var(--accent); color: #fff; }
+        
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .card { background: var(--bg-secondary); padding: 22px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .card h3 { margin-bottom: 18px; border-left: 4px solid var(--accent); padding-left: 10px; font-size: 18px; }
+        
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 15px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        label { font-size: 13px; color: var(--text-muted); font-weight: 600; }
+        
+        input, select, textarea { background: var(--bg-card); border: 1px solid var(--border); color: #fff; padding: 11px; border-radius: 6px; font-size: 14px; outline: none; }
+        input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+        
+        button, .btn-link { background-color: var(--accent); color: #fff; border: none; padding: 12px 22px; border-radius: 6px; cursor: pointer; font-weight: bold; display: inline-flex; align-items: center; gap: 8px; justify-content: center; text-decoration: none; }
+        button:hover, .btn-link:hover { background-color: var(--accent-hover); }
+        button.btn-success { background-color: var(--success); }
+        button.btn-danger { background-color: var(--danger); }
+        .btn-block { width: 100%; }
+
+        .import-box { background: rgba(0, 173, 181, 0.05); border: 2px dashed var(--accent); padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
+
+        .table-responsive { width: 100%; overflow-x: auto; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+        th, td { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+        th { background: var(--bg-card); color: var(--text-muted); font-weight: 600; }
+        
+        .editable-input { background: transparent; border: 1px dashed transparent; color: #fff; padding: 4px 8px; width: 80px; border-radius: 4px; text-align: center; font-weight: bold; }
+        .editable-input:focus { background: var(--bg-card); border-color: var(--accent); outline: none; }
+        .editable-input:hover { border-color: var(--text-muted); }
+        
+        .grid-2col { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+        @media (max-width: 768px) { .grid-2col { grid-template-columns: 1fr; } }
+        
+        .list-manager { max-height: 250px; overflow-y: auto; background: var(--bg-card); padding: 10px; border-radius: 6px; border: 1px solid var(--border); }
+        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .delete-btn { background: none; color: var(--danger); border: none; cursor: pointer; }
+    </style>
+    <!-- Librerías de Excel (Lectura y Escritura) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>🛠️ Sistema Taller <span>CEBECO S.A.</span></h1>
+            <div class="header-actions">
+                <button onclick="exportarExcel()" class="btn-success">📊 Guardar y Descargar Excel</button>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="cambiarPestana('pane-stock')">📦 Catálogo e Inventario Inicial</button>
+            <button class="tab-btn" onclick="cambiarPestana('pane-mov')">📝 Registrar Movimiento</button>
+            <button class="tab-btn" onclick="cambiarPestana('pane-listas')">⚙️ Obras y Personal</button>
+            <button class="tab-btn" onclick="cambiarPestana('pane-historial')">📜 Historial de Vales</button>
+        </div>
+
+        <!-- PESTAÑA: STOCK ACTUAL E INVENTARIO INICIAL -->
+        <div id="pane-stock" class="tab-content active">
+            <div class="import-box">
+                <p style="font-weight: bold; margin-bottom: 10px;">📥 ¿Querés cargar tus Stocks Iniciales desde un Excel?</p>
+                <input type="file" id="importar-excel-file" accept=".xlsx, .xls" onchange="importarExcel(event)" style="display:none;">
+                <button onclick="document.getElementById('importar-excel-file').click()">📂 Seleccionar Archivo Excel (.xlsx)</button>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">Debe tener una pestaña llamada "INVENTARIO" con las columnas "Insumo" y "Stock Inicial".</p>
+            </div>
+
+            <div class="grid-2col">
+                <div>
+                    <div class="card" style="padding: 15px; margin-bottom: 15px; display: flex; gap: 10px;">
+                        <input type="text" id="buscar-stock" placeholder="🔍 Buscar insumo por nombre o categoría..." oninput="filtrarStock()" style="width: 100%;">
+                    </div>
+                    
+                    <p style="font-size: 13px; color: var(--accent); margin-bottom: 8px; font-weight: bold;">💡 Consejo: Podés hacer clic en los números de la columna "Stock Inicial" para editarlos y corregirlos directamente en la grilla.</p>
+                    
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Categoría</th>
+                                    <th>Nombre del Insumo</th>
+                                    <th>Unidad</th>
+                                    <th style="text-align: center; background: rgba(0, 173, 181, 0.1);">Stock Inicial ✏️</th>
+                                    <th style="text-align: center; color: var(--success);">Entradas</th>
+                                    <th style="text-align: center; color: var(--danger);">Salidas</th>
+                                    <th style="text-align: center; font-weight: bold; color: var(--accent);">Stock Real</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-inventario-cuerpo"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="card">
+                        <h3>➕ Agregar Nuevo Artículo</h3>
+                        <form id="form-nuevo-insumo" onsubmit="agregarInsumo(event)">
+                            <div class="form-group" style="margin-bottom: 12px;">
+                                <label>Categoría / Grupo</label>
+                                <select id="ins-grupo" required>
+                                    <option value="CONSUMIBLES">CONSUMIBLES</option>
+                                    <option value="DISCOS">DISCOS</option>
+                                    <option value="EPP">EPP</option>
+                                    <option value="HERRAJE">HERRAJE</option>
+                                    <option value="SELLADORES">SELLADORES</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 12px;">
+                                <label>Nombre Completo</label>
+                                <input type="text" id="ins-nombre" placeholder="Ej: Electrodos 3.25" required>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 12px;">
+                                <label>Unidad de Medida</label>
+                                <input type="text" id="ins-unidad" placeholder="un, kg, par" required>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 15px;">
+                                <label>Stock Inicial de Arranque</label>
+                                <input type="number" id="ins-inicial" value="0" min="0" step="any" required>
+                            </div>
+                            <button type="submit" class="btn-block">Guardar en Catálogo</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PESTAÑA: REGISTRAR MOVIMIENTO -->
+        <div id="pane-mov" class="tab-content">
+            <div class="card" style="max-width: 800px; margin: 0 auto;">
+                <h3>Asentar Vale de Material</h3>
+                <form id="form-movimiento" onsubmit="guardarMovimiento(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Seleccionar Insumo</label>
+                            <select id="mov-insumo" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Operación</label>
+                            <select id="mov-tipo" required>
+                                <option value="Salida">📤 Salida (Retiro de material)</option>
+                                <option value="Entrada">📥 Entrada (Ingreso / Compra)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Cantidad</label>
+                            <input type="number" id="mov-cantidad" min="0.01" step="any" required>
+                        </div>
+                    </div>
+                    <div class="form-grid" style="margin-top: 15px;">
+                        <div class="form-group">
+                            <label>Operario que retira / entrega</label>
+                            <select id="mov-empleado" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Obra Destino</label>
+                            <select id="mov-obra" required></select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top: 15px; margin-bottom: 20px;">
+                        <label>Detalle de Ubicación o Notas (Ej: Sótano, Planta Alta, Refuerzos)</label>
+                        <textarea id="mov-detalle" rows="2" placeholder="Escribí acá detalles clave para saber exactamente dónde se destinó..."></textarea>
+                    </div>
+                    <button type="submit" class="btn-block" style="font-size: 16px; padding: 14px;">Registrar Movimiento</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- PESTAÑA: CONFIGURACIÓN DE OBRAS Y PERSONAL -->
+        <div id="pane-listas" class="tab-content">
+            <div class="grid-2col">
+                <div class="card">
+                    <h3>🏢 Listado de Obras Activas</h3>
+                    <form id="form-nueva-obra" onsubmit="agregarObra(event)" style="display:flex; gap:10px; margin-bottom:15px;">
+                        <input type="text" id="obra-nombre" placeholder="Nombre de la obra..." required>
+                        <button type="submit">Agregar</button>
+                    </form>
+                    <div class="list-manager" id="lista-obras-manager"></div>
+                </div>
+                <div class="card">
+                    <h3>👤 Personal / Operarios</h3>
+                    <form id="form-nuevo-personal" onsubmit="agregarPersonal(event)" style="display:flex; gap:10px; margin-bottom:15px;">
+                        <input type="text" id="personal-nombre" placeholder="Nombre completo..." required>
+                        <button type="submit">Agregar</button>
+                    </form>
+                    <div class="list-manager" id="lista-personal-manager"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PESTAÑA: HISTORIAL -->
+        <div id="pane-historial" class="tab-content">
+            <div class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 20px;">
+                <span id="contador-movimientos" style="font-weight: bold; color: var(--text-muted);">0 movimientos cargados</span>
+                <button onclick="borrarHistorial()" class="btn-danger" style="padding: 6px 12px; font-size:12px;">Limpiar Historial</button>
+            </div>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fecha / Hora</th>
+                            <th>Insumo</th>
+                            <th>Tipo</th>
+                            <th>Cantidad</th>
+                            <th>Empleado</th>
+                            <th>Obra</th>
+                            <th>Ubicación / Notas</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-historial"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CARGA TOTAL AUTOMÁTICA DE TODOS LOS REGISTROS ORIGINALES DEL EXCEL DEL USER
+        const insumosPredeterminados = [{"grupo": "CONSUMIBLES", "nombre": "Tobera cónica 250", "unidad": "un", "inicial": 3}, {"grupo": "CONSUMIBLES", "nombre": "Difusores de 0,9", "unidad": "un", "inicial": 3}, {"grupo": "CONSUMIBLES", "nombre": "Difusores M8", "unidad": "un", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Tubo de contacto de 0,9", "unidad": "un", "inicial": 5}, {"grupo": "CONSUMIBLES", "nombre": "Tubo de contacto de 1,2", "unidad": "un", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Porta tubo", "unidad": "un", "inicial": 6}, {"grupo": "CONSUMIBLES", "nombre": "Antiadherente para soldar", "unidad": "un", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Electrodo 6013 de 2,5", "unidad": "kg", "inicial": 20}, {"grupo": "CONSUMIBLES", "nombre": "Electrodo 6013 de 3,25", "unidad": "kg", "inicial": 15}, {"grupo": "CONSUMIBLES", "nombre": "Electrodo 7018 de 2,5", "unidad": "kg", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Electrodo 7018 de 3,25", "unidad": "kg", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Electrodo 308 de 2,5 (inox)", "unidad": "kg", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Rollo de alambre de 0,9", "unidad": "rollo", "inicial": 1}, {"grupo": "CONSUMIBLES", "nombre": "Rollo de alambre macizo de 1,2", "unidad": "rollo", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Tobera P80 plasma", "unidad": "un", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Electrodo P80 plasma", "unidad": "un", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Lija tela esmeril G80", "unidad": "un", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Lija tela esmeril G60", "unidad": "un", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Lija tela esmeril G40", "unidad": "un", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Aislante ceramico P80 plasma", "unidad": "un", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "cepillo copa rizado", "unidad": "un", "inicial": 1}, {"grupo": "DISCOS", "nombre": "Disco de corte 4 x 1 mm", "unidad": "un", "inicial": 0}, {"grupo": "DISCOS", "nombre": "Disco de corte 4 1/2", "unidad": "un", "inicial": 1}, {"grupo": "DISCOS", "nombre": "Disco de corte de 7", "unidad": "un", "inicial": 0}, {"grupo": "DISCOS", "nombre": "Disco de corte de 9", "unidad": "un", "inicial": 30}, {"grupo": "DISCOS", "nombre": "Disco de desvaste de 7", "unidad": "un", "inicial": 17}, {"grupo": "DISCOS", "nombre": "Disco de desvaste de 9", "unidad": "un", "inicial": 0}, {"grupo": "DISCOS", "nombre": "Disco de desvaste 4 1/2", "unidad": "un", "inicial": 0}, {"grupo": "DISCOS", "nombre": "Discos Flap de 4 1/2 x grano 40", "unidad": "un", "inicial": 13}, {"grupo": "DISCOS", "nombre": "Discos para Sensitiva", "unidad": "un", "inicial": 3}, {"grupo": "EPP", "nombre": "Guantes Moteados", "unidad": "Par", "inicial": 0}, {"grupo": "EPP", "nombre": "Guantes Vaqueta", "unidad": "Par", "inicial": 5}, {"grupo": "EPP", "nombre": "Guante Soldador", "unidad": "Par", "inicial": 2}, {"grupo": "EPP", "nombre": "Lentes Negros", "unidad": "un", "inicial": 0}, {"grupo": "EPP", "nombre": "Lentes Transparentes", "unidad": "un", "inicial": 0}, {"grupo": "EPP", "nombre": "Sordinas", "unidad": "un", "inicial": 0}, {"grupo": "EPP", "nombre": "Vidrios Blancos", "unidad": "un", "inicial": 0}, {"grupo": "EPP", "nombre": "Vidrios Negros", "unidad": "un", "inicial": 0}, {"grupo": "EPP", "nombre": "Cinta Métrica de 5m", "unidad": "un", "inicial": 0}, {"grupo": "EPP", "nombre": "Cinta Métrica de 3m", "unidad": "un", "inicial": 0}, {"grupo": "EPP", "nombre": "Cinta Métrica de 8m", "unidad": "un", "inicial": 0}, {"grupo": "EPP", "nombre": "Barbijo", "unidad": "un", "inicial": 0}, {"grupo": "EPP", "nombre": "Guantes Latex", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Cerradura Acytra Mod. 301", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Cerraduras de Gas", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Cerradura Kallay Mod. 4002", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Cerradura Kallay Mod. 4006", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Cerradura Kallay Mod. 5002", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Cerradura Kallay Mod. 5003", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Cerradura de Baño", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Cerradura Prive Mod. 202", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Cerrojo llave cruz Yaltres", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "cerradura doble paleta", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Chapas de Gas", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Bisagra munición Comun", "unidad": "Par", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Bisagra munición Reforzada", "unidad": "Par", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Bisagra Ficha de 120", "unidad": "Par", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Bisagra Ficha 100", "unidad": "Par", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Bisagra Ficha 60", "unidad": "Par", "inicial": 0}, {"grupo": "SELLADORES", "nombre": "Sella Canaleta", "unidad": "un", "inicial": 0}, {"grupo": "SELLADORES", "nombre": "Sellador pintable", "unidad": "un", "inicial": 0}, {"grupo": "SELLADORES", "nombre": "Sellador Transparente", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Rejilla GAS", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Bisagra Pomelas 70", "unidad": "Par", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Bisagra Pomelas 60", "unidad": "Par", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Bisagra Pomelas 50", "unidad": "Par", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Bisagra Pomelas 40", "unidad": "Par", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Bisagra Pomelas 80", "unidad": "Par", "inicial": 0}];
+        const obrasPredeterminadas = ["Pañol", "Remodelación Terminal (GLLEN)", "Infraestructura Educativa (Razquin)", "Polideportivo Tupungato", "Barrio \"Los Gringos\"", "Barrio \"BADANO\"", "Barrio \"BEI\"", "Barrio \"Cooperativa\"", "Museo Las Bovedas", "Urb. Palmira", "CEBECO", "Urb. Santa Rosa", "Panel SIP", "Taller Aluminio", "Cloaca Tunuyan", "Urb. Las Catitas", "Banco La Paz", "Calle Manuel A Saenz"];
+        const personalPredeterminado = ["Ortega Oscar", "Rivas Daniel", "Horca Ricardo", "Bomio Damian", "Coronel Pablo", "Sosa Jose", "Coronel Leonardo", "Peñaloza Enzo", "Quiroga Axel", "Muñoz Nicolas", "Deposito Central", "Juan Perez", "Ramos Mariano"];
+
+        let insumos = JSON.parse(localStorage.getItem('cebeco_insumos')) || insumosPredeterminados;
+        let obras = JSON.parse(localStorage.getItem('cebeco_obras')) || obrasPredeterminadas;
+        let personal = JSON.parse(localStorage.getItem('cebeco_personal')) || personalPredeterminado;
+        let movimientos = JSON.parse(localStorage.getItem('cebeco_movimientos')) || [];
+
+        function guardarYActualizar() {
+            localStorage.setItem('cebeco_insumos', JSON.stringify(insumos));
+            localStorage.setItem('cebeco_obras', JSON.stringify(obras));
+            localStorage.setItem('cebeco_personal', JSON.stringify(personal));
+            localStorage.setItem('cebeco_movimientos', JSON.stringify(movimientos));
+            cargarSelectores();
+        }
+
+        function cambiarPestana(id) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            event.currentTarget.classList.add('active');
+            
+            if(id === 'pane-stock') filtrarStock();
+            if(id === 'pane-listas') renderizarListasConfig();
+            if(id === 'pane-historial') listarHistorial();
+        }
+
+        function cargarSelectores() {
+            const selectInsumo = document.getElementById('mov-insumo');
+            if (selectInsumo) {
+                const sorted = [...insumos].sort((a,b) => a.grupo.localeCompare(b.grupo) || a.nombre.localeCompare(b.nombre));
+                selectInsumo.innerHTML = sorted.map(i => `<option value="${i.nombre}">${i.grupo} - ${i.nombre} (${i.unidad})</option>`).join('');
+            }
+            const selectObra = document.getElementById('mov-obra');
+            if (selectObra) selectObra.innerHTML = [...obras].sort().map(o => `<option value="${o}">${o}</option>`).join('');
+            
+            const selectEmp = document.getElementById('mov-empleado');
+            if (selectEmp) selectEmp.innerHTML = [...personal].sort().map(p => `<option value="${p}">${p}</option>`).join('');
+        }
+
+        // EDITAR STOCK INICIAL DIRECTAMENTE EN LA TABLA
+        function cambiarStockInicial(nombreInsumo, nuevoValor) {
+            let valorNum = parseFloat(nuevoValor);
+            if (isNaN(valorNum) || valorNum < 0) valorNum = 0;
+            
+            let item = insumos.find(i => i.nombre === nombreInsumo);
+            if (item) {
+                item.inicial = valorNum;
+                guardarYActualizar();
+                
+                // Recalcular el stock real en la fila de forma inmediata sin romper el foco del teclado
+                let entradas = movimientos.filter(m => m.insumo === nombreInsumo && m.tipo === 'Entrada').reduce((acc, cur) => acc + cur.cantidad, 0);
+                let salidas = movimientos.filter(m => m.insumo === nombreInsumo && m.tipo === 'Salida').reduce((acc, cur) => acc + cur.cantidad, 0);
+                let stockReal = item.inicial + entradas - salidas;
+                
+                document.getElementById(`real-${btoa(nombreInsumo)}`).innerText = stockReal.toFixed(2).replace('.00','');
+            }
+        }
+
+        // FILTRAR Y MOSTRAR STOCK EN FORMATO TABLA EDITABLE
+        function filtrarStock() {
+            const buscador = document.getElementById('buscar-stock').value.toLowerCase();
+            const tbody = document.getElementById('tabla-inventario-cuerpo');
+            tbody.innerHTML = '';
+
+            // Ordenar catálogo por grupo y nombre
+            const sortedInsumos = [...insumos].sort((a,b) => a.grupo.localeCompare(b.grupo) || a.nombre.localeCompare(b.nombre));
+
+            sortedInsumos.forEach(ins => {
+                if (buscador && !ins.nombre.toLowerCase().includes(buscador) && !ins.grupo.toLowerCase().includes(buscador)) return;
+
+                let entradas = movimientos.filter(m => m.insumo === ins.nombre && m.tipo === 'Entrada').reduce((acc, cur) => acc + cur.cantidad, 0);
+                let salidas = movimientos.filter(m => m.insumo === ins.nombre && m.tipo === 'Salida').reduce((acc, cur) => acc + cur.cantidad, 0);
+                let stockReal = ins.inicial + entradas - salidas;
+                
+                let safeId = btoa(ins.nombre); // Evitar caracteres raros en IDs de HTML
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td style="color:var(--text-muted); font-size:12px;">${ins.grupo}</td>
+                        <td><strong>${ins.nombre}</strong></td>
+                        <td>${ins.unidad}</td>
+                        <td style="text-align: center; background: rgba(0, 173, 181, 0.05);">
+                            <input type="number" class="editable-input" value="${ins.inicial}" step="any" min="0" 
+                                oninput="cambiarStockInicial('${ins.nombre.replace(/'/g, "\'")}', this.value)">
+                        </td>
+                        <td style="text-align: center; color: var(--success);">${entradas || '-'}</td>
+                        <td style="text-align: center; color: var(--danger);">${salidas || '-'}</td>
+                        <td id="real-${safeId}" style="text-align: center; font-weight: bold; color: ${stockReal < 0 ? 'var(--danger)' : 'var(--accent)'}; font-size: 15px;">
+                            ${stockReal.toFixed(2).replace('.00','')}
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // PARSER DE ARCHIVOS EXCEL EXTRERNO PARA CARGAR TODOS LOS STOCK INICIALES DE GOLPE
+        function importarExcel(e) {
+            const files = e.target.files;
+            if (!files || files.length === 0) return;
+            const file = files[0];
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    if (!workbook.SheetNames.includes("INVENTARIO")) {
+                        alert("Error: El Excel debe contener una pestaña llamada exactamente 'INVENTARIO'.");
+                        return;
+                    }
+                    
+                    const worksheet = workbook.Sheets["INVENTARIO"];
+                    const json = XLSX.utils.sheet_to_json(worksheet);
+                    
+                    let actualizados = 0;
+                    json.forEach(row => {
+                        let nombreExcel = row["Insumo"] || row["Insumos"] || row["Item"];
+                        let stockInicialExcel = parseFloat(row["Stock Inicial"] || row["Inicial"] || row["Stock_Inicial"]);
+                        
+                        if (nombreExcel && !isNaN(stockInicialExcel)) {
+                            let match = insumos.find(i => i.nombre.toLowerCase().trim() === nombreExcel.toLowerCase().trim());
+                            if (match) {
+                                match.inicial = stockInicialExcel;
+                                actualizados++;
+                            } else {
+                                // Si no existe en el catálogo base, lo agrega automáticamente
+                                let grupoExcel = row["Grupo"] || row["Categoría"] || "CONSUMIBLES";
+                                let unidadExcel = row["Unidad"] || "un";
+                                insumos.push({ grupo: grupoExcel, nombre: nombreExcel, unidad: unidadExcel, inicial: stockInicialExcel });
+                                actualizados++;
+                            }
+                        }
+                    });
+                    
+                    guardarYActualizar();
+                    filtrarStock();
+                    alert(`¡Éxito! Se actualizaron los stocks iniciales de ${actualizados} insumos correctamente.`);
+                } catch(err) {
+                    alert("Ocurrió un error al procesar el archivo Excel. Asegurate de que tenga el formato correcto.");
+                    console.error(err);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // CARGAR MOVIMIENTOS
+        function guardarMovimiento(e) {
+            e.preventDefault();
+            const insumoNombre = document.getElementById('mov-insumo').value;
+            const tipo = document.getElementById('mov-tipo').value;
+            const cantidad = parseFloat(document.getElementById('mov-cantidad').value);
+            const empleado = document.getElementById('mov-empleado').value;
+            const obra = document.getElementById('mov-obra').value;
+            const detalle = document.getElementById('mov-detalle').value.trim();
+
+            const nuevoMov = {
+                id: 'ID-' + Math.floor(100000 + Math.random() * 900000),
+                fecha: new Date().toISOString().split('T')[0] + ' ' + new Date().toTimeString().split(' ')[0].substr(0,5),
+                insumo: insumoNombre,
+                tipo: tipo,
+                cantidad: cantidad,
+                empleado: empleado,
+                obra: obra,
+                detalle: detalle
+            };
+
+            movimientos.unshift(nuevoMov);
+            guardarYActualizar();
+            document.getElementById('form-movimiento').reset();
+            alert('📥 Vale registrado y guardado con éxito.');
+        }
+
+        // AGREGAR ARTÍCULOS A MANO
+        function agregarInsumo(e) {
+            e.preventDefault();
+            const grupo = document.getElementById('ins-grupo').value;
+            const nombre = document.getElementById('ins-nombre').value.trim();
+            const unidad = document.getElementById('ins-unidad').value.trim();
+            const inicial = parseFloat(document.getElementById('ins-inicial').value) || 0;
+
+            if (insumos.some(i => i.nombre.toLowerCase() === nombre.toLowerCase())) return alert('Este insumo ya existe.');
+
+            insumos.push({ grupo, nombre, unidad, inicial });
+            guardarYActualizar();
+            document.getElementById('form-nuevo-insumo').reset();
+            filtrarStock();
+            alert('Artículo sumado al catálogo.');
+        }
+
+        function agregarObra(e) {
+            e.preventDefault();
+            const nombre = document.getElementById('obra-nombre').value.trim();
+            if (obras.some(o => o.toLowerCase() === nombre.toLowerCase())) return alert('Ya existe.');
+            obras.push(nombre);
+            guardarYActualizar();
+            document.getElementById('form-nueva-obra').reset();
+            renderizarListasConfig();
+        }
+
+        function eliminarObra(idx) {
+            if(confirm('¿Sacar obra del menú desplegable?')) { obras.splice(idx, 1); guardarYActualizar(); renderizarListasConfig(); }
+        }
+
+        function agregarPersonal(e) {
+            e.preventDefault();
+            const nombre = document.getElementById('personal-nombre').value.trim();
+            if (personal.some(p => p.toLowerCase() === nombre.toLowerCase())) return alert('Ya existe.');
+            personal.push(nombre);
+            guardarYActualizar();
+            document.getElementById('form-nuevo-personal').reset();
+            renderizarListasConfig();
+        }
+
+        function eliminarPersonal(idx) {
+            if(confirm('¿Sacar operario del menú desplegable?')) { personal.splice(idx, 1); guardarYActualizar(); renderizarListasConfig(); }
+        }
+
+        function renderizarListasConfig() {
+            document.getElementById('lista-obras-manager').innerHTML = obras.map((o, idx) => `<div class="list-item"><span>🏢 ${o}</span><button class="delete-btn" onclick="eliminarObra(${idx})">❌</button></div>`).join('');
+            document.getElementById('lista-personal-manager').innerHTML = personal.map((p, idx) => `<div class="list-item"><span>👤 ${p}</span><button class="delete-btn" onclick="eliminarPersonal(${idx})">❌</button></div>`).join('');
+        }
+
+        function listarHistorial() {
+            document.getElementById('contador-movimientos').innerText = `${movimientos.length} vales registrados`;
+            document.getElementById('tabla-historial').innerHTML = movimientos.map(m => `
+                <tr>
+                    <td>${m.fecha}</td>
+                    <td><strong>${m.insumo}</strong></td>
+                    <td style="color:${m.tipo === 'Entrada' ? 'var(--success)' : 'var(--danger)'}; font-weight:bold;">${m.tipo === 'Entrada' ? '📥 Entrada' : '📤 Salida'}</td>
+                    <td><strong>${m.cantidad}</strong></td>
+                    <td>${m.empleado}</td>
+                    <td>${m.obra}</td>
+                    <td style="color:var(--accent); font-style:italic;">${m.detalle || '-'}</td>
+                </tr>
+            `).join('');
+        }
+
+        function borrarHistorial() {
+            if(confirm('¿Borrar historial? Los stocks se basarán puramente en el Inicial.')) { movimientos = []; guardarYActualizar(); listarHistorial(); }
+        }
+
+        function exportarExcel() {
+            const wb = XLSX.utils.book_new();
+            const dataStock = insumos.map(ins => {
+                let entradas = movimientos.filter(m => m.insumo === ins.nombre && m.tipo === 'Entrada').reduce((acc, cur) => acc + cur.cantidad, 0);
+                let salidas = movimientos.filter(m => m.insumo === ins.nombre && m.tipo === 'Salida').reduce((acc, cur) => acc + cur.cantidad, 0);
+                return { 'Grupo': ins.grupo, 'Insumo': ins.nombre, 'Unidad': ins.unidad, 'Stock Inicial': ins.inicial, 'Entradas (Auto)': entradas, 'Salidas (Auto)': salidas, 'Stock Real': ins.inicial + entradas - salidas };
+            });
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dataStock), "INVENTARIO");
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(movimientos.map(m => ({ 'ID': m.id, 'Fecha / Hora': m.fecha, 'Obra': m.obra, 'Empleado': m.empleado, 'Insumo': m.insumo, 'Tipo': m.tipo, 'Cantidad': m.cantidad, 'Detalle / Nota': m.detalle }))), "MOVIMIENTO");
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(obras.map(o => ({'OBRAS': o}))), "OBRAS");
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(personal.map(p => ({'Nombre': p}))), "PERSONAL");
+            XLSX.writeFile(wb, `Inventario_Taller_CEBECO.xlsx`);
+        }
+
+        window.onload = function() {
+            guardarYActualizar();
+            filtrarStock();
+        };
+    </script>
+</body>
+</html>
