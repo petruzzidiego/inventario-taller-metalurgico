@@ -15,6 +15,7 @@
             --accent-hover: #008f96;
             --success: #2ecc71;
             --danger: #e74c3c;
+            --warning: #f1c40f;
             --border: #384152;
         }
 
@@ -50,10 +51,11 @@
         input, select, textarea { background: var(--bg-card); border: 1px solid var(--border); color: #fff; padding: 11px; border-radius: 6px; font-size: 14px; outline: none; }
         input:focus, select:focus, textarea:focus { border-color: var(--accent); }
         
-        button, .btn-link { background-color: var(--accent); color: #fff; border: none; padding: 12px 22px; border-radius: 6px; cursor: pointer; font-weight: bold; display: inline-flex; align-items: center; gap: 8px; justify-content: center; text-decoration: none; }
-        button:hover, .btn-link:hover { background-color: var(--accent-hover); }
+        button { background-color: var(--accent); color: #fff; border: none; padding: 12px 22px; border-radius: 6px; cursor: pointer; font-weight: bold; display: inline-flex; align-items: center; gap: 8px; justify-content: center; }
+        button:hover { background-color: var(--accent-hover); }
         button.btn-success { background-color: var(--success); }
         button.btn-danger { background-color: var(--danger); }
+        button.btn-warning { background-color: var(--warning); color: #1e222b; }
         .btn-block { width: 100%; }
 
         .import-box { background: rgba(0, 173, 181, 0.05); border: 2px dashed var(--accent); padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
@@ -73,8 +75,9 @@
         .list-manager { max-height: 250px; overflow-y: auto; background: var(--bg-card); padding: 10px; border-radius: 6px; border: 1px solid var(--border); }
         .list-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .delete-btn { background: none; color: var(--danger); border: none; cursor: pointer; }
+        .action-btn-sm { padding: 4px 8px; font-size: 11px; border-radius: 4px; }
+        .row-inactive { opacity: 0.4; background: rgba(0,0,0,0.15); }
     </style>
-    <!-- Librerías de Excel (Lectura y Escritura) -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
@@ -94,22 +97,21 @@
             <button class="tab-btn" onclick="cambiarPestana('pane-historial')">📜 Historial de Vales</button>
         </div>
 
-        <!-- PESTAÑA: STOCK ACTUAL E INVENTARIO INICIAL -->
         <div id="pane-stock" class="tab-content active">
             <div class="import-box">
                 <p style="font-weight: bold; margin-bottom: 10px;">📥 ¿Querés cargar tus Stocks Iniciales desde un Excel?</p>
                 <input type="file" id="importar-excel-file" accept=".xlsx, .xls" onchange="importarExcel(event)" style="display:none;">
                 <button onclick="document.getElementById('importar-excel-file').click()">📂 Seleccionar Archivo Excel (.xlsx)</button>
-                <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">Debe tener una pestaña llamada "INVENTARIO" con las columnas "Insumo" y "Stock Inicial".</p>
             </div>
 
             <div class="grid-2col">
                 <div>
-                    <div class="card" style="padding: 15px; margin-bottom: 15px; display: flex; gap: 10px;">
+                    <div class="card" style="padding: 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px;">
                         <input type="text" id="buscar-stock" placeholder="🔍 Buscar insumo por nombre o categoría..." oninput="filtrarStock()" style="width: 100%;">
+                        <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                            <input type="checkbox" id="ver-ocultos" onchange="filtrarStock()"> Mostrar artículos dados de baja / ocultos
+                        </label>
                     </div>
-                    
-                    <p style="font-size: 13px; color: var(--accent); margin-bottom: 8px; font-weight: bold;">💡 Consejo: Podés hacer clic en los números de la columna "Stock Inicial" para editarlos y corregirlos directamente en la grilla.</p>
                     
                     <div class="table-responsive">
                         <table>
@@ -122,6 +124,7 @@
                                     <th style="text-align: center; color: var(--success);">Entradas</th>
                                     <th style="text-align: center; color: var(--danger);">Salidas</th>
                                     <th style="text-align: center; font-weight: bold; color: var(--accent);">Stock Real</th>
+                                    <th style="text-align: center;">Acción</th>
                                 </tr>
                             </thead>
                             <tbody id="tabla-inventario-cuerpo"></tbody>
@@ -162,14 +165,13 @@
             </div>
         </div>
 
-        <!-- PESTAÑA: REGISTRAR MOVIMIENTO -->
         <div id="pane-mov" class="tab-content">
             <div class="card" style="max-width: 800px; margin: 0 auto;">
                 <h3>Asentar Vale de Material</h3>
                 <form id="form-movimiento" onsubmit="guardarMovimiento(event)">
                     <div class="form-grid">
                         <div class="form-group">
-                            <label>Seleccionar Insumo</label>
+                            <label>Seleccionar Insumo (Solo Activos)</label>
                             <select id="mov-insumo" required></select>
                         </div>
                         <div class="form-group">
@@ -195,15 +197,14 @@
                         </div>
                     </div>
                     <div class="form-group" style="margin-top: 15px; margin-bottom: 20px;">
-                        <label>Detalle de Ubicación o Notas (Ej: Sótano, Planta Alta, Refuerzos)</label>
-                        <textarea id="mov-detalle" rows="2" placeholder="Escribí acá detalles clave para saber exactamente dónde se destinó..."></textarea>
+                        <label>Detalle de Ubicación o Notas</label>
+                        <textarea id="mov-detalle" rows="2" placeholder="Notas adicionales..."></textarea>
                     </div>
                     <button type="submit" class="btn-block" style="font-size: 16px; padding: 14px;">Registrar Movimiento</button>
                 </form>
             </div>
         </div>
 
-        <!-- PESTAÑA: CONFIGURACIÓN DE OBRAS Y PERSONAL -->
         <div id="pane-listas" class="tab-content">
             <div class="grid-2col">
                 <div class="card">
@@ -225,7 +226,6 @@
             </div>
         </div>
 
-        <!-- PESTAÑA: HISTORIAL -->
         <div id="pane-historial" class="tab-content">
             <div class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 20px;">
                 <span id="contador-movimientos" style="font-weight: bold; color: var(--text-muted);">0 movimientos cargados</span>
@@ -251,8 +251,7 @@
     </div>
 
     <script>
-        // CARGA TOTAL AUTOMÁTICA DE TODOS LOS REGISTROS ORIGINALES DEL EXCEL DEL USER
-        const insumosPredeterminados = [{"grupo": "CONSUMIBLES", "nombre": "Tobera cónica 250", "unidad": "un", "inicial": 3}, {"grupo": "CONSUMIBLES", "nombre": "Difusores de 0,9", "unidad": "un", "inicial": 3}, {"grupo": "CONSUMIBLES", "nombre": "Difusores M8", "unidad": "un", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Tubo de contacto de 0,9", "unidad": "un", "inicial": 5}, {"grupo": "CONSUMIBLES", "nombre": "Tubo de contacto de 1,2", "unidad": "un", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Porta tubo", "unidad": "un", "inicial": 6}, {"grupo": "CONSUMIBLES", "nombre": "Antiadherente para soldar", "unidad": "un", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Electrodo 6013 de 2,5", "unidad": "kg", "inicial": 20}, {"grupo": "CONSUMIBLES", "nombre": "Electrodo 6013 de 3,25", "unidad": "kg", "inicial": 15}, {"grupo": "CONSUMIBLES", "nombre": "Electrodo 7018 de 2,5", "unidad": "kg", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Electrodo 7018 de 3,25", "unidad": "kg", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Electrodo 308 de 2,5 (inox)", "unidad": "kg", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Rollo de alambre de 0,9", "unidad": "rollo", "inicial": 1}, {"grupo": "CONSUMIBLES", "nombre": "Rollo de alambre macizo de 1,2", "unidad": "rollo", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Tobera P80 plasma", "unidad": "un", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Electrodo P80 plasma", "unidad": "un", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Lija tela esmeril G80", "unidad": "un", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Lija tela esmeril G60", "unidad": "un", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Lija tela esmeril G40", "unidad": "un", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "Aislante ceramico P80 plasma", "unidad": "un", "inicial": 0}, {"grupo": "CONSUMIBLES", "nombre": "cepillo copa rizado", "unidad": "un", "inicial": 1}, {"grupo": "DISCOS", "nombre": "Disco de corte 4 x 1 mm", "unidad": "un", "inicial": 0}, {"grupo": "DISCOS", "nombre": "Disco de corte 4 1/2", "unidad": "un", "inicial": 1}, {"grupo": "DISCOS", "nombre": "Disco de corte de 7", "unidad": "un", "inicial": 0}, {"grupo": "DISCOS", "nombre": "Disco de corte de 9", "unidad": "un", "inicial": 30}, {"grupo": "DISCOS", "nombre": "Disco de desvaste de 7", "unidad": "un", "inicial": 17}, {"grupo": "DISCOS", "nombre": "Disco de desvaste de 9", "unidad": "un", "inicial": 0}, {"grupo": "DISCOS", "nombre": "Disco de desvaste 4 1/2", "unidad": "un", "inicial": 0}, {"grupo": "DISCOS", "nombre": "Discos Flap de 4 1/2 x grano 40", "unidad": "un", "inicial": 13}, {"grupo": "DISCOS", "nombre": "Discos para Sensitiva", "unidad": "un", "inicial": 3}, {"grupo": "EPP", "nombre": "Guantes Moteados", "unidad": "Par", "inicial": 0}, {"grupo": "EPP", "nombre": "Guantes Vaqueta", "unidad": "Par", "inicial": 5}, {"grupo": "EPP", "nombre": "Guante Soldador", "unidad": "Par", "inicial": 2}, {"grupo": "EPP", "nombre": "Lentes Negros", "unidad": "un", "inicial": 0}, {"grupo": "EPP", "nombre": "Lentes Transparentes", "unidad": "un", "inicial": 0}, {"grupo": "EPP", "nombre": "Sordinas", "unidad": "un", "inicial": 0}, {"grupo": "EPP", "nombre": "Vidrios Blancos", "unidad": "un", "inicial": 0}, {"grupo": "EPP", "nombre": "Vidrios Negros", "unidad": "un", "inicial": 0}, {"grupo": "EPP", "nombre": "Cinta Métrica de 5m", "unidad": "un", "inicial": 0}, {"grupo": "EPP", "nombre": "Cinta Métrica de 3m", "unidad": "un", "inicial": 0}, {"grupo": "EPP", "nombre": "Cinta Métrica de 8m", "unidad": "un", "inicial": 0}, {"grupo": "EPP", "nombre": "Barbijo", "unidad": "un", "inicial": 0}, {"grupo": "EPP", "nombre": "Guantes Latex", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Cerradura Acytra Mod. 301", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Cerraduras de Gas", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Cerradura Kallay Mod. 4002", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Cerradura Kallay Mod. 4006", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Cerradura Kallay Mod. 5002", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Cerradura Kallay Mod. 5003", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Cerradura de Baño", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Cerradura Prive Mod. 202", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Cerrojo llave cruz Yaltres", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "cerradura doble paleta", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Chapas de Gas", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Bisagra munición Comun", "unidad": "Par", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Bisagra munición Reforzada", "unidad": "Par", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Bisagra Ficha de 120", "unidad": "Par", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Bisagra Ficha 100", "unidad": "Par", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Bisagra Ficha 60", "unidad": "Par", "inicial": 0}, {"grupo": "SELLADORES", "nombre": "Sella Canaleta", "unidad": "un", "inicial": 0}, {"grupo": "SELLADORES", "nombre": "Sellador pintable", "unidad": "un", "inicial": 0}, {"grupo": "SELLADORES", "nombre": "Sellador Transparente", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Rejilla GAS", "unidad": "un", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Bisagra Pomelas 70", "unidad": "Par", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Bisagra Pomelas 60", "unidad": "Par", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Bisagra Pomelas 50", "unidad": "Par", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Bisagra Pomelas 40", "unidad": "Par", "inicial": 0}, {"grupo": "HERRAJE", "nombre": "Bisagra Pomelas 80", "unidad": "Par", "inicial": 0}];
+        const insumosPredeterminados = [{"grupo": "CONSUMIBLES", "nombre": "Tobera cónica 250", "unidad": "un", "inicial": 3, "activo": true}, {"grupo": "CONSUMIBLES", "nombre": "Difusores de 0,9", "unidad": "un", "inicial": 3, "activo": true}, {"grupo": "CONSUMIBLES", "nombre": "Difusores M8", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "CONSUMIBLES", "nombre": "Tubo de contacto de 0,9", "unidad": "un", "inicial": 5, "activo": true}, {"grupo": "CONSUMIBLES", "nombre": "Tubo de contacto de 1,2", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "CONSUMIBLES", "nombre": "Porta tubo", "unidad": "un", "inicial": 6, "activo": true}, {"grupo": "CONSUMIBLES", "nombre": "Antiadherente para soldar", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "CONSUMIBLES", "nombre": "Electrodo 6013 de 2,5", "unidad": "kg", "inicial": 20, "activo": true}, {"grupo": "CONSUMIBLES", "nombre": "Electrodo 6013 de 3,25", "unidad": "kg", "inicial": 15, "activo": true}, {"grupo": "CONSUMIBLES", "nombre": "Electrodo 7018 de 2,5", "unidad": "kg", "inicial": 0, "activo": true}, {"grupo": "CONSUMIBLES", "nombre": "Electrodo 7018 de 3,25", "unidad": "kg", "inicial": 0, "activo": true}, {"grupo": "CONSUMIBLES", "nombre": "Electrodo 308 de 2,5 (inox)", "unidad": "kg", "inicial": 0, "activo": true}, {"grupo": "CONSUMIBLES", "nombre": "Rollo de alambre de 0,9", "unidad": "rollo", "inicial": 1, "activo": true}, {"grupo": "CONSUMIBLES", "nombre": "Rollo de alambre macizo de 1,2", "unidad": "rollo", "inicial": 0, "activo": true}, {"grupo": "CONSUMIBLES", "nombre": "Tobera P80 plasma", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "CONSUMIBLES", "nombre": "Electrodo P80 plasma", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "CONSUMIBLES", "nombre": "Lija tela esmeril G80", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "CONSUMIBLES", "nombre": "Lija tela esmeril G60", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "CONSUMIBLES", "nombre": "Lija tela esmeril G40", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "CONSUMIBLES", "nombre": "Aislante ceramico P80 plasma", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "CONSUMIBLES", "nombre": "cepillo copa rizado", "unidad": "un", "inicial": 1, "activo": true}, {"grupo": "DISCOS", "nombre": "Disco de corte 4 x 1 mm", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "DISCOS", "nombre": "Disco de corte 4 1/2", "unidad": "un", "inicial": 1, "activo": true}, {"grupo": "DISCOS", "nombre": "Disco de corte de 7", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "DISCOS", "nombre": "Disco de corte de 9", "unidad": "un", "inicial": 30, "activo": true}, {"grupo": "DISCOS", "nombre": "Disco de desvaste de 7", "unidad": "un", "inicial": 17, "activo": true}, {"grupo": "DISCOS", "nombre": "Disco de desvaste de 9", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "DISCOS", "nombre": "Disco de desvaste 4 1/2", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "DISCOS", "nombre": "Discos Flap de 4 1/2 x grano 40", "unidad": "un", "inicial": 13, "activo": true}, {"grupo": "DISCOS", "nombre": "Discos para Sensitiva", "unidad": "un", "inicial": 3, "activo": true}, {"grupo": "EPP", "nombre": "Guantes Moteados", "unidad": "Par", "inicial": 0, "activo": true}, {"grupo": "EPP", "nombre": "Guantes Vaqueta", "unidad": "Par", "inicial": 5, "activo": true}, {"grupo": "EPP", "nombre": "Guante Soldador", "unidad": "Par", "inicial": 2, "activo": true}, {"grupo": "EPP", "nombre": "Lentes Negros", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "EPP", "nombre": "Lentes Transparentes", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "EPP", "nombre": "Sordinas", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "EPP", "nombre": "Vidrios Blancos", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "EPP", "nombre": "Vidrios Negros", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "EPP", "nombre": "Cinta Métrica de 5m", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "EPP", "nombre": "Cinta Métrica de 3m", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "EPP", "nombre": "Cinta Métrica de 8m", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "EPP", "nombre": "Barbijo", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "EPP", "nombre": "Guantes Latex", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "HERRAJE", "nombre": "Cerradura Acytra Mod. 301", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "HERRAJE", "nombre": "Cerraduras de Gas", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "HERRAJE", "nombre": "Cerradura Kallay Mod. 4002", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "HERRAJE", "nombre": "Cerradura Kallay Mod. 4006", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "HERRAJE", "nombre": "Cerradura Kallay Mod. 5002", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "HERRAJE", "nombre": "Cerradura Kallay Mod. 5003", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "HERRAJE", "nombre": "Cerradura de Baño", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "HERRAJE", "nombre": "Cerradura Prive Mod. 202", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "HERRAJE", "nombre": "Cerrojo llave cruz Yaltres", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "HERRAJE", "nombre": "cerradura doble paleta", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "HERRAJE", "nombre": "Chapas de Gas", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "HERRAJE", "nombre": "Bisagra munición Comun", "unidad": "Par", "inicial": 0, "activo": true}, {"grupo": "HERRAJE", "nombre": "Bisagra munición Reforzada", "unidad": "Par", "inicial": 0, "activo": true}, {"grupo": "HERRAJE", "nombre": "Bisagra Ficha de 120", "unidad": "Par", "inicial": 0, "activo": true}, {"grupo": "HERRAJE", "nombre": "Bisagra Ficha 100", "unidad": "Par", "inicial": 0, "activo": true}, {"grupo": "HERRAJE", "nombre": "Bisagra Ficha 60", "unidad": "Par", "inicial": 0, "activo": true}, {"grupo": "SELLADORES", "nombre": "Sella Canaleta", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "SELLADORES", "nombre": "Sellador pintable", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "SELLADORES", "nombre": "Sellador Transparente", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "HERRAJE", "nombre": "Rejilla GAS", "unidad": "un", "inicial": 0, "activo": true}, {"grupo": "HERRAJE", "nombre": "Bisagra Pomelas 70", "unidad": "Par", "inicial": 0, "activo": true}, {"grupo": "HERRAJE", "nombre": "Bisagra Pomelas 60", "unidad": "Par", "inicial": 0, "activo": true}, {"grupo": "HERRAJE", "nombre": "Bisagra Pomelas 50", "unidad": "Par", "inicial": 0, "activo": true}, {"grupo": "HERRAJE", "nombre": "Bisagra Pomelas 40", "unidad": "Par", "inicial": 0, "activo": true}, {"grupo": "HERRAJE", "nombre": "Bisagra Pomelas 80", "unidad": "Par", "inicial": 0, "activo": true}];
         const obrasPredeterminadas = ["Pañol", "Remodelación Terminal (GLLEN)", "Infraestructura Educativa (Razquin)", "Polideportivo Tupungato", "Barrio \"Los Gringos\"", "Barrio \"BADANO\"", "Barrio \"BEI\"", "Barrio \"Cooperativa\"", "Museo Las Bovedas", "Urb. Palmira", "CEBECO", "Urb. Santa Rosa", "Panel SIP", "Taller Aluminio", "Cloaca Tunuyan", "Urb. Las Catitas", "Banco La Paz", "Calle Manuel A Saenz"];
         const personalPredeterminado = ["Ortega Oscar", "Rivas Daniel", "Horca Ricardo", "Bomio Damian", "Coronel Pablo", "Sosa Jose", "Coronel Leonardo", "Peñaloza Enzo", "Quiroga Axel", "Muñoz Nicolas", "Deposito Central", "Juan Perez", "Ramos Mariano"];
 
@@ -260,6 +259,8 @@
         let obras = JSON.parse(localStorage.getItem('cebeco_obras')) || obrasPredeterminadas;
         let personal = JSON.parse(localStorage.getItem('cebeco_personal')) || personalPredeterminado;
         let movimientos = JSON.parse(localStorage.getItem('cebeco_movimientos')) || [];
+
+        insumos.forEach(i => { if(i.activo === undefined) i.activo = true; });
 
         function guardarYActualizar() {
             localStorage.setItem('cebeco_insumos', JSON.stringify(insumos));
@@ -283,7 +284,8 @@
         function cargarSelectores() {
             const selectInsumo = document.getElementById('mov-insumo');
             if (selectInsumo) {
-                const sorted = [...insumos].sort((a,b) => a.grupo.localeCompare(b.grupo) || a.nombre.localeCompare(b.nombre));
+                const activos = insumos.filter(i => i.activo !== false);
+                const sorted = [...activos].sort((a,b) => a.grupo.localeCompare(b.grupo) || a.nombre.localeCompare(b.nombre));
                 selectInsumo.innerHTML = sorted.map(i => `<option value="${i.nombre}">${i.grupo} - ${i.nombre} (${i.unidad})</option>`).join('');
             }
             const selectObra = document.getElementById('mov-obra');
@@ -293,63 +295,70 @@
             if (selectEmp) selectEmp.innerHTML = [...personal].sort().map(p => `<option value="${p}">${p}</option>`).join('');
         }
 
-        // EDITAR STOCK INICIAL DIRECTAMENTE EN LA TABLA
         function cambiarStockInicial(nombreInsumo, nuevoValor) {
             let valorNum = parseFloat(nuevoValor);
             if (isNaN(valorNum) || valorNum < 0) valorNum = 0;
-            
             let item = insumos.find(i => i.nombre === nombreInsumo);
             if (item) {
                 item.inicial = valorNum;
                 guardarYActualizar();
-                
-                // Recalcular el stock real en la fila de forma inmediata sin romper el foco del teclado
                 let entradas = movimientos.filter(m => m.insumo === nombreInsumo && m.tipo === 'Entrada').reduce((acc, cur) => acc + cur.cantidad, 0);
                 let salidas = movimientos.filter(m => m.insumo === nombreInsumo && m.tipo === 'Salida').reduce((acc, cur) => acc + cur.cantidad, 0);
-                let stockReal = item.inicial + entradas - salidas;
-                
-                document.getElementById(`real-${btoa(nombreInsumo)}`).innerText = stockReal.toFixed(2).replace('.00','');
+                document.getElementById(`real-${btoa(nombreInsumo)}`).innerText = (item.inicial + entradas - salidas).toFixed(2).replace('.00','');
             }
         }
 
-        // FILTRAR Y MOSTRAR STOCK EN FORMATO TABLA EDITABLE
+        function cambiarEstadoInsumo(nombreInsumo, estadoActual) {
+            let item = insumos.find(i => i.nombre === nombreInsumo);
+            if(item) {
+                item.activo = !estadoActual;
+                guardarYActualizar();
+                filtrarStock();
+            }
+        }
+
         function filtrarStock() {
             const buscador = document.getElementById('buscar-stock').value.toLowerCase();
+            const verOcultos = document.getElementById('ver-ocultos').checked;
             const tbody = document.getElementById('tabla-inventario-cuerpo');
             tbody.innerHTML = '';
 
-            // Ordenar catálogo por grupo y nombre
             const sortedInsumos = [...insumos].sort((a,b) => a.grupo.localeCompare(b.grupo) || a.nombre.localeCompare(b.nombre));
 
             sortedInsumos.forEach(ins => {
+                if (!ins.activo && !verOcultos) return;
                 if (buscador && !ins.nombre.toLowerCase().includes(buscador) && !ins.grupo.toLowerCase().includes(buscador)) return;
 
                 let entradas = movimientos.filter(m => m.insumo === ins.nombre && m.tipo === 'Entrada').reduce((acc, cur) => acc + cur.cantidad, 0);
                 let salidas = movimientos.filter(m => m.insumo === ins.nombre && m.tipo === 'Salida').reduce((acc, cur) => acc + cur.cantidad, 0);
                 let stockReal = ins.inicial + entradas - salidas;
-                
-                let safeId = btoa(ins.nombre); // Evitar caracteres raros en IDs de HTML
+                let safeId = btoa(ins.nombre);
 
                 tbody.innerHTML += `
-                    <tr>
+                    <tr class="${ins.activo ? '' : 'row-inactive'}">
                         <td style="color:var(--text-muted); font-size:12px;">${ins.grupo}</td>
-                        <td><strong>${ins.nombre}</strong></td>
+                        <td><strong>${ins.nombre}</strong> ${ins.activo ? '' : '🛑 (Baja)'}</td>
                         <td>${ins.unidad}</td>
                         <td style="text-align: center; background: rgba(0, 173, 181, 0.05);">
                             <input type="number" class="editable-input" value="${ins.inicial}" step="any" min="0" 
-                                oninput="cambiarStockInicial('${ins.nombre.replace(/'/g, "\'")}', this.value)">
+                                oninput="cambiarStockInicial('${ins.nombre.replace(/'/g, "\\'")}', this.value)">
                         </td>
                         <td style="text-align: center; color: var(--success);">${entradas || '-'}</td>
                         <td style="text-align: center; color: var(--danger);">${salidas || '-'}</td>
                         <td id="real-${safeId}" style="text-align: center; font-weight: bold; color: ${stockReal < 0 ? 'var(--danger)' : 'var(--accent)'}; font-size: 15px;">
                             ${stockReal.toFixed(2).replace('.00','')}
                         </td>
+                        <td style="text-align: center;">
+                            <button onclick="cambiarEstadoInsumo('${ins.nombre.replace(/'/g, "\\'")}', ${ins.activo})" 
+                                    class="${ins.activo ? 'btn-danger' : 'btn-warning'} action-btn-sm">
+                                ${ins.activo ? '🛑 Ocultar' : '✅ Activar'}
+                            </button>
+                        </td>
                     </tr>
                 `;
             });
         }
 
-        // PARSER DE ARCHIVOS EXCEL EXTRERNO PARA CARGAR TODOS LOS STOCK INICIALES DE GOLPE
         function importarExcel(e) {
             const files = e.target.files;
             if (!files || files.length === 0) return;
@@ -360,88 +369,67 @@
                 try {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
-                    
-                    if (!workbook.SheetNames.includes("INVENTARIO")) {
-                        alert("Error: El Excel debe contener una pestaña llamada exactamente 'INVENTARIO'.");
-                        return;
-                    }
-                    
-                    const worksheet = workbook.Sheets["INVENTARIO"];
-                    const json = XLSX.utils.sheet_to_json(worksheet);
+                    if (!workbook.SheetNames.includes("INVENTARIO")) return alert("Error: Falta pestaña 'INVENTARIO'.");
+                    const json = XLSX.utils.sheet_to_json(workbook.Sheets["INVENTARIO"]);
                     
                     let actualizados = 0;
                     json.forEach(row => {
-                        let nombreExcel = row["Insumo"] || row["Insumos"] || row["Item"];
-                        let stockInicialExcel = parseFloat(row["Stock Inicial"] || row["Inicial"] || row["Stock_Inicial"]);
-                        
+                        let nombreExcel = row["Insumo"] || row["Insumos"];
+                        let stockInicialExcel = parseFloat(row["Stock Inicial"] || row["Inicial"]);
                         if (nombreExcel && !isNaN(stockInicialExcel)) {
                             let match = insumos.find(i => i.nombre.toLowerCase().trim() === nombreExcel.toLowerCase().trim());
                             if (match) {
                                 match.inicial = stockInicialExcel;
                                 actualizados++;
                             } else {
-                                // Si no existe en el catálogo base, lo agrega automáticamente
-                                let grupoExcel = row["Grupo"] || row["Categoría"] || "CONSUMIBLES";
+                                let grupoExcel = row["Grupo"] || "CONSUMIBLES";
                                 let unidadExcel = row["Unidad"] || "un";
-                                insumos.push({ grupo: grupoExcel, nombre: nombreExcel, unidad: unidadExcel, inicial: stockInicialExcel });
+                                insumos.push({ grupo: grupoExcel, nombre: nombreExcel, unidad: unidadExcel, inicial: stockInicialExcel, activo: true });
                                 actualizados++;
                             }
                         }
                     });
-                    
                     guardarYActualizar();
                     filtrarStock();
-                    alert(`¡Éxito! Se actualizaron los stocks iniciales de ${actualizados} insumos correctamente.`);
-                } catch(err) {
-                    alert("Ocurrió un error al procesar el archivo Excel. Asegurate de que tenga el formato correcto.");
-                    console.error(err);
-                }
+                    alert(`¡Éxito! Se procesaron ${actualizados} registros.`);
+                } catch(err) { alert("Error al leer Excel."); }
             };
             reader.readAsArrayBuffer(file);
         }
 
-        // CARGAR MOVIMIENTOS
         function guardarMovimiento(e) {
             e.preventDefault();
-            const insumoNombre = document.getElementById('mov-insumo').value;
-            const tipo = document.getElementById('mov-tipo').value;
-            const cantidad = parseFloat(document.getElementById('mov-cantidad').value);
-            const empleado = document.getElementById('mov-empleado').value;
-            const obra = document.getElementById('mov-obra').value;
-            const detalle = document.getElementById('mov-detalle').value.trim();
-
             const nuevoMov = {
                 id: 'ID-' + Math.floor(100000 + Math.random() * 900000),
                 fecha: new Date().toISOString().split('T')[0] + ' ' + new Date().toTimeString().split(' ')[0].substr(0,5),
-                insumo: insumoNombre,
-                tipo: tipo,
-                cantidad: cantidad,
-                empleado: empleado,
-                obra: obra,
-                detalle: detalle
+                insumo: document.getElementById('mov-insumo').value,
+                tipo: document.getElementById('mov-tipo').value,
+                cantidad: parseFloat(document.getElementById('mov-cantidad').value),
+                empleado: document.getElementById('mov-empleado').value,
+                obra: document.getElementById('mov-obra').value,
+                detalle: document.getElementById('mov-detalle').value.trim()
             };
-
             movimientos.unshift(nuevoMov);
             guardarYActualizar();
             document.getElementById('form-movimiento').reset();
-            alert('📥 Vale registrado y guardado con éxito.');
+            alert('📥 Vale registrado.');
         }
 
-        // AGREGAR ARTÍCULOS A MANO
         function agregarInsumo(e) {
             e.preventDefault();
-            const grupo = document.getElementById('ins-grupo').value;
             const nombre = document.getElementById('ins-nombre').value.trim();
-            const unidad = document.getElementById('ins-unidad').value.trim();
-            const inicial = parseFloat(document.getElementById('ins-inicial').value) || 0;
-
-            if (insumos.some(i => i.nombre.toLowerCase() === nombre.toLowerCase())) return alert('Este insumo ya existe.');
-
-            insumos.push({ grupo, nombre, unidad, inicial });
+            if (insumos.some(i => i.nombre.toLowerCase() === nombre.toLowerCase())) return alert('Ya existe.');
+            insumos.push({
+                grupo: document.getElementById('ins-grupo').value,
+                nombre,
+                unidad: document.getElementById('ins-unidad').value.trim(),
+                inicial: parseFloat(document.getElementById('ins-inicial').value) || 0,
+                activo: true
+            });
             guardarYActualizar();
             document.getElementById('form-nuevo-insumo').reset();
             filtrarStock();
-            alert('Artículo sumado al catálogo.');
+            alert('Artículo sumado.');
         }
 
         function agregarObra(e) {
@@ -454,9 +442,7 @@
             renderizarListasConfig();
         }
 
-        function eliminarObra(idx) {
-            if(confirm('¿Sacar obra del menú desplegable?')) { obras.splice(idx, 1); guardarYActualizar(); renderizarListasConfig(); }
-        }
+        function eliminarObra(idx) { if(confirm('¿Sacar obra?')) { obras.splice(idx, 1); guardarYActualizar(); renderizarListasConfig(); } }
 
         function agregarPersonal(e) {
             e.preventDefault();
@@ -468,9 +454,7 @@
             renderizarListasConfig();
         }
 
-        function eliminarPersonal(idx) {
-            if(confirm('¿Sacar operario del menú desplegable?')) { personal.splice(idx, 1); guardarYActualizar(); renderizarListasConfig(); }
-        }
+        function eliminarPersonal(idx) { if(confirm('¿Sacar operario?')) { personal.splice(idx, 1); guardarYActualizar(); renderizarListasConfig(); } }
 
         function renderizarListasConfig() {
             document.getElementById('lista-obras-manager').innerHTML = obras.map((o, idx) => `<div class="list-item"><span>🏢 ${o}</span><button class="delete-btn" onclick="eliminarObra(${idx})">❌</button></div>`).join('');
@@ -492,19 +476,17 @@
             `).join('');
         }
 
-        function borrarHistorial() {
-            if(confirm('¿Borrar historial? Los stocks se basarán puramente en el Inicial.')) { movimientos = []; guardarYActualizar(); listarHistorial(); }
-        }
+        function borrarHistorial() { if(confirm('¿Borrar historial?')) { movimientos = []; guardarYActualizar(); listarHistorial(); } }
 
         function exportarExcel() {
             const wb = XLSX.utils.book_new();
             const dataStock = insumos.map(ins => {
                 let entradas = movimientos.filter(m => m.insumo === ins.nombre && m.tipo === 'Entrada').reduce((acc, cur) => acc + cur.cantidad, 0);
                 let salidas = movimientos.filter(m => m.insumo === ins.nombre && m.tipo === 'Salida').reduce((acc, cur) => acc + cur.cantidad, 0);
-                return { 'Grupo': ins.grupo, 'Insumo': ins.nombre, 'Unidad': ins.unidad, 'Stock Inicial': ins.inicial, 'Entradas (Auto)': entradas, 'Salidas (Auto)': salidas, 'Stock Real': ins.inicial + entradas - salidas };
+                return { 'Grupo': ins.grupo, 'Insumo': ins.nombre, 'Unidad': ins.unidad, 'Stock Inicial': ins.inicial, 'Entradas': entradas, 'Salidas': salidas, 'Stock Real': ins.inicial + entradas - salidas, 'Estado': ins.activo ? 'Activo' : 'Oculto' };
             });
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dataStock), "INVENTARIO");
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(movimientos.map(m => ({ 'ID': m.id, 'Fecha / Hora': m.fecha, 'Obra': m.obra, 'Empleado': m.empleado, 'Insumo': m.insumo, 'Tipo': m.tipo, 'Cantidad': m.cantidad, 'Detalle / Nota': m.detalle }))), "MOVIMIENTO");
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(movimientos.map(m => ({ 'ID': m.id, 'Fecha': m.fecha, 'Obra': m.obra, 'Empleado': m.empleado, 'Insumo': m.insumo, 'Tipo': m.tipo, 'Cantidad': m.cantidad, 'Nota': m.detalle }))), "MOVIMIENTO");
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(obras.map(o => ({'OBRAS': o}))), "OBRAS");
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(personal.map(p => ({'Nombre': p}))), "PERSONAL");
             XLSX.writeFile(wb, `Inventario_Taller_CEBECO.xlsx`);
